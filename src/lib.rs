@@ -2,6 +2,8 @@
 #![feature(global_asm)]
 #![feature(llvm_asm)]
 
+//extern crate alloc;
+
 #[macro_use]
 
 mod io;
@@ -17,5 +19,8 @@ mod timer;
 mod uart;
 mod plic;
 
+//mod fs;
 mod consts;
+
+mod fatfs;
 

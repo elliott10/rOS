@@ -5,9 +5,19 @@
  */
 
 //DRAM 默认128MB, 可见qemu/hw/riscv/virt.c
-pub const PHYSICAL_MEMORY_END: usize = 0x88000000;
+//pub const PHYSICAL_MEMORY_END: usize = 0x88000000;
 
 //被opensbi占用
+/*
 pub const KERNEL_BEGIN_PADDR: usize = 0x80200000;
 pub const KERNEL_BEGIN_VADDR: usize = 0x80200000;
+*/
+
+//D1 ALLWINNER
+pub const PHYSICAL_MEMORY_END: usize = 0x85000000; //1G
+
+pub const KERNEL_BEGIN_PADDR: usize = 0x45000000;
+pub const KERNEL_BEGIN_VADDR: usize = 0x45000000;
+
+// paddr + offset = vaddr
 

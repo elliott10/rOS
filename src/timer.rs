@@ -27,15 +27,17 @@ pub fn init(){
 }
 
 pub fn clock_set_next_event(){
-    //set_timer( time::read() as u64 + TIMEBASE);
+    set_timer( time::read() as u64 + TIMEBASE);
 
-	println!("timer!");
+	println!("S timer!");
     
     //k210 可能需要页表，才可读写该地址
+    /*
     unsafe {
         //MMIO_MTIMECMP.write_volatile(MMIO_MTIME.read_volatile() + 10_000_000);
         set_timer( MMIO_MTIME.read_volatile() + TIMEBASE );
     }
+    */
 
 }
 

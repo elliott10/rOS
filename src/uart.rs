@@ -64,16 +64,22 @@ pub fn init(&mut self) {
 }
 
 pub fn simple_init(&mut self) {
-	let ptr = self.base_address as *mut u8;
+	//let ptr = self.base_address as *mut u8;
+	let ptr = self.base_address as *mut u32;
 	unsafe {
+        //D1 ALLWINNER的uart中断使能还需要再研究。。。
+        //println!("Uart regs:\n{:#x},\n{:#x},\n{:#x},\n{:#x},\n{:#x}", ptr.read_volatile(), ptr.add(1).read_volatile(), ptr.add(2).read_volatile(), ptr.add(3).read_volatile(), ptr.add(4).read_volatile());
+
         // Enable FIFO; (base + 2)
-        ptr.add(2).write_volatile(0xC7);
+        ptr.add(2).write_volatile(0x7);
 
         // MODEM Ctrl; (base + 4)
-        ptr.add(4).write_volatile(0x0B);
+        ptr.add(4).write_volatile(0x3);
 
+        // D1 UART_IER offset = 0x4
+        //
         // Enable interrupts; (base + 1)
-        ptr.add(1).write_volatile(0x01);
+        ptr.add(1).write_volatile(0x1);
     }
 }
 
@@ -130,10 +136,14 @@ fn unsafe mmio_read(address: usize, offset: usize, value: u8) -> u8 {
 */
 
 pub fn handle_interrupt() {
-	let mut my_uart = Uart::new(0x1000_0000);
+    // D1 ALLWINNER
+    let mut my_uart = Uart::new(0x02500000);
+
 	if let Some(c) = my_uart.get() {
 		//CONSOLE
 		//push_stdin(c);
+
+        let c = c & 0xff;
 
 		match c {
 			0x7f => { //0x8 [backspace] ; 而实际qemu运行，[backspace]键输出0x7f, 表示del

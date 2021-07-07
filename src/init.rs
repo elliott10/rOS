@@ -1,4 +1,5 @@
 global_asm!(include_str!("boot/entry64.asm"));
+global_asm!(include_str!("link_user.S"));
 
 use crate::io::getchar;
 use crate::sbi;
@@ -14,8 +15,10 @@ extern "C" fn rust_main() -> !{
     crate::interrupt::init(); //未初始化可能会无限重复打印
     crate::timer::init();
 
+    /*
     crate::interrupt::init_soft(); //注意，会影响其他中断??? bug
     sbi::send_ipi(0);
+    */
 
 	extern "C" {
 		fn _start();
@@ -28,6 +31,13 @@ extern "C" fn rust_main() -> !{
 	sbi::console_putchar_u8(b'L');
 	sbi::console_putchar_u8(b'Y');
 	sbi::console_putchar_u8(b'\n');
+
+println!("      ____");
+println!(" ____/ ___|___  _ __ ___");
+println!("|_  / |   / _ \\| '__/ _ \\");
+println!(" / /| |__| (_) | | |  __/");
+println!("/___|\\____\\___/|_|  \\___|");
+println!();
 
     /*
     let mut _in: usize = 0;
@@ -47,13 +57,15 @@ extern "C" fn rust_main() -> !{
 	extern "C" {
 		fn end();
 	}
-	println!("Free physical memory paddr = [{:#x}, {:#x})", end as usize + ( KERNEL_BEGIN_PADDR - KERNEL_BEGIN_VADDR), PHYSICAL_MEMORY_END);
+	println!("Free physical memory paddr = [{:#x}, {:#x})", end as usize - ( KERNEL_BEGIN_VADDR - KERNEL_BEGIN_PADDR), PHYSICAL_MEMORY_END);
 
 	unsafe{
 		llvm_asm!("ebreak"::::"volatile");
 	}
 
-    loop {}
+    //crate::fs::init();
+
+    //loop {}
 
     //panic!("end of rust_main()");
 	loop {

@@ -76,7 +76,7 @@ pub fn init(){
 
         init_uart();
 	}
-	println!("+++ setup interrupte! +++");
+	println!("+++ setup interrupt! +++");
 }
 /*
  PMP, 物理内存保护, 允许M模式指定U模式可以访问的内存地址;
@@ -91,6 +91,8 @@ pub fn rust_trap(tf: &mut TrapFrame){
     let stval = tf.stval;
     let is_int = tf.scause.bits() >> 63;
     let code = tf.scause.bits() & !(1 << 63);
+
+    println!("Trap, sepc:{:#x}, stval:{:#x}, code:{:?}", sepc, stval, code);
 
 	match tf.scause.cause() {
 		Trap::Exception(Exception::Breakpoint) => breakpoint(&mut tf.sepc),
@@ -143,10 +145,16 @@ fn super_timer(){
 }
 
 fn init_uart(){
+    /*
     uart::Uart::new(0x1000_0000).init();
 
     use core::fmt::Write;
     write!(crate::uart::Uart::new(0x1000_0000), "Uart writing test !\n");
+    */
+    // D1 ALLWINNER
+    //uart::Uart::new(0x02500000).simple_init();
+    use core::fmt::Write;
+    write!(crate::uart::Uart::new(0x02500000), "Uart writing test !\r\n");
 
     /*
     let p = pac::Peripherals::take().unwrap();
@@ -156,7 +164,10 @@ fn init_uart(){
     */
 
     // k210 0x38000000
+    // 发现k210 sdk使用的调试串口是: UART3_BASE_ADDR (0x50230000U)
     // Interrupt Enable Register: 0x10, 32位寄存器, 使能接收中断：bit1 = 1 <= (1 << 1)
+    //uart::Uart::new(0x5023_0000).init();
+
     /*
     let mut ie: u32 = 0;
     unsafe {
@@ -174,20 +185,31 @@ fn init_uart(){
 pub fn init_ext(){
     // Qemu virt
     // UART0 = 10
-    plic::set_priority(10, 7);
-    plic::set_threshold(0);
-    plic::enable(10);
+    //plic::set_priority(10, 7);
+    //
+    // D1 ALLWINNER UART0 = 18
+    plic::set_priority(18, 31);
+    plic::set_threshold(2);
+    plic::enable(18);
+    //plic::enable(10);
 
     // k210 UART = 33
+    // 默认调试串口 UART3 = 13
+    /*
+    plic::set_priority(13, 7);
+    plic::set_threshold(0);
+    plic::enable(13);
+    */
+
     /*
     plic::set_priority(33, 7);
     plic::set_threshold(0);
     plic::enable(33);
+    */
 
 
     // set opensbi s_insn()
-    sbi::set_s_insn(s_insn as usize);
-    */
+    //sbi::set_s_insn(s_insn as usize);
     
     println!("+++ Setting up PLIC +++");
 }
@@ -206,6 +228,8 @@ pub fn init_soft(){
 
 pub fn s_insn(){
     println!("+++ s_insn()");
+
+    plic::handle_interrupt();
 
 }
 

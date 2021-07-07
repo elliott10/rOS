@@ -1,17 +1,12 @@
 use crate::uart;
 
-const MMODE: usize = 0;
-
-// k210
-//const MMODE: usize = 1;
-
 //通过MMIO地址对平台级中断控制器PLIC的寄存器进行设置
 //
 //Source 1 priority: 0x0c000004
 //Source 2 priority: 0x0c000008
-const PLIC_PRIORITY:   usize = 0x0c00_0000;
+const PLIC_PRIORITY:   usize = 0x1000_0000;
 //Pending 32位寄存器，每一位标记一个中断源ID
-const PLIC_PENDING:    usize = 0x0c00_1000;
+const PLIC_PENDING:    usize = 0x1000_1000;
 
 //Target 0 threshold: 0x0c200000
 //Target 0 claim    : 0x0c200004
@@ -19,8 +14,8 @@ const PLIC_PENDING:    usize = 0x0c00_1000;
 //Target 1 threshold: 0x0c201000 *
 //Target 1 claim    : 0x0c201004 *
 
-const PLIC_THRESHOLD:  usize = if MMODE == 1 { 0x0c200000 }else{ 0x0c201000 };
-const PLIC_CLAIM:      usize = if MMODE == 1 { 0x0c200004 }else{ 0x0c201004 };
+const PLIC_THRESHOLD:  usize = 0x1020_1000;
+const PLIC_CLAIM:      usize = 0x1020_1004;
 
 //注意一个核的不同权限模式是不同Target
 //Target: 0  1  2        3  4  5
@@ -28,7 +23,7 @@ const PLIC_CLAIM:      usize = if MMODE == 1 { 0x0c200004 }else{ 0x0c201004 };
 //
 //target 0 enable: 0x0c002000
 //target 1 enable: 0x0c002080 *
-const PLIC_INT_ENABLE: usize = if MMODE == 1 { 0x0c002000 }else{ 0x0c002080 }; //基于opensbi后一般运行于Hart0 S态，故为Target1
+const PLIC_INT_ENABLE: usize = 0x1000_2080 ; //基于opensbi后一般运行于Hart0 S态，故为Target1
 
 //PLIC是async cause 11
 //声明claim会清除中断源上的相应pending位。
@@ -39,6 +34,7 @@ pub fn next() -> Option<u32> {
 	let claim_no;
 	unsafe {
 		claim_no = claim_reg.read_volatile();
+        //println!("PLIC claim, Read {:#x}, Value: {:#x}", claim_reg as usize, claim_no as usize);
 	}
 	if claim_no == 0 {
 		None //没有可用中断待定
@@ -64,6 +60,7 @@ pub fn is_pending(id: u32) -> bool {
 	let pend_ids;
 	unsafe {
 		pend_ids = pend.read_volatile();
+        println!("PLIC pending: Read {:#x}, Value: {:#x}", pend as usize, pend_ids as usize);
 	}
 	actual_id & pend_ids != 0
 }
@@ -73,39 +70,38 @@ pub fn is_pending(id: u32) -> bool {
 pub fn enable(id: u32) {
 	let enables = PLIC_INT_ENABLE as *mut u32; //32位的寄存器
 
-    if MMODE == 1 {
-        // K210
-        unsafe {
-            //id = 33
-            //enables.add(1).write_volatile(enables.add(1).read_volatile() | (1 << 1));
-            (0x0c00_2004 as *mut u32).write_volatile(1 << 1);
+    let actual_id = 1 << id;
+    unsafe {
+        enables.write_volatile(enables.read_volatile() | actual_id);
+        // 0x0c00_2000 <=~ (1 << 10)
 
-            //(0x0c002100 as *mut u32).add(1).write_volatile(0<<1);
-        }
-    }else{
-        let actual_id = 1 << id;
-        unsafe {
-            enables.write_volatile(enables.read_volatile() | actual_id);
-            // 0x0c00_2000 <=~ (1 << 10)
-        }
+        let read_enable = enables.read_volatile();
+        println!("PLIC enable, Read {:#x}, Value: {:#x}", enables as usize, read_enable as usize);
     }
 }
 
 //设置中断源的优先级，分0～7级，7是最高级, eg:这里id=10, 表示第10个中断源的设置, prio=1
 pub fn set_priority(id: u32, prio: u8) {
-	let actual_prio = prio as u32 & 7;
+	//let actual_prio = prio as u32 & 7;
+	let actual_prio = prio as u32 & 0x1f;
 	let prio_reg = PLIC_PRIORITY as *mut u32;
 	unsafe {
 		prio_reg.add(id as usize).write_volatile(actual_prio); //0x0c000000 + 4 * 10 <= 1 = 1 & 7
+
+        let read_prio = prio_reg.add(id as usize).read_volatile();
+        println!("PLIC priority, Read {:#x}, Value: {:#x}", prio_reg.add(id as usize) as usize, read_prio as usize);
 	}
 }
 
 //设置中断target的全局阀值［0..7]， <= threshold会被屏蔽
 pub fn set_threshold(tsh: u8) {
-	let actual_tsh = tsh & 7; //使用0b111保留最后三位
+	let actual_tsh = tsh & 0x1f; //使用0b11111保留最后5位
 	let tsh_reg = PLIC_THRESHOLD as *mut u32;
 	unsafe {
 		tsh_reg.write_volatile(actual_tsh as u32); // 0x0c20_0000 <= 0 = 0 & 7
+
+        let read_tsh = tsh_reg.read_volatile();
+        println!("PLIC threshold, Read {:#x}, Value: {:#x}", tsh_reg as usize, read_tsh as usize);
 	}
 }
 
@@ -115,13 +111,23 @@ pub fn handle_interrupt() {
 			1..=8 => {
 				//virtio::handle_interrupt(interrupt);
 			},
-			10 => { //UART中断ID是10
-				uart::handle_interrupt();
+			//10 => { //UART中断ID是10
+			18 => { //D1 ALLWINNER
+			//33 => { //UART中断ID是10
+
+				//println!("External interrupt: {}", interrupt);
+
+        use crate::sbi;
+        let sbic = sbi::console_getchar();
+        print!("sbi: {}", sbic);
+
+                //uart::handle_interrupt();
 			},
 			_ => {
 				println!("Unknown external interrupt: {}", interrupt);
 			},
 		}
+
 		//这将复位pending的中断，允许UART再次中断。
 		//否则，UART将被“卡住”
 		complete(interrupt);
