@@ -11,7 +11,7 @@ pub const MMIO_MTIME: *const u64 = 0x0200_BFF8 as *const u64;
 pub static mut TICKS: usize = 0;
 
 //static TIMEBASE: u64 = 100000;
-static TIMEBASE: u64 = 10_000_000;
+static TIMEBASE: u64 = 1_0000_0000;
 
 pub fn init(){
 	unsafe {

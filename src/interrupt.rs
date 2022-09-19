@@ -24,8 +24,6 @@ use crate::uart;
 use k210_hal::{clock::Clocks, pac, prelude::*};
 use k210_hal::serial::SerialExt;
 
-
-
 global_asm!(include_str!("trap/trap.asm"));
 
 fn init_m(){
@@ -70,8 +68,10 @@ pub fn init(){
         //init_m();
 
         //注意！bug! 如果之后sie::set_ssoft(),会出现无法收到S态的外部中断和时钟中断
-        //打开外部中断
-        sie::set_sext();
+        //
+        //外部中断
+        sie::set_sext(); //防止外部中断干扰初始化
+
         init_ext();
 
         init_uart();
@@ -92,11 +92,17 @@ pub fn rust_trap(tf: &mut TrapFrame){
     let is_int = tf.scause.bits() >> 63;
     let code = tf.scause.bits() & !(1 << 63);
 
-    println!("Trap, sepc:{:#x}, stval:{:#x}, code:{:?}", sepc, stval, code);
+    //println!("Trap, sepc:{:#x}, stval:{:#x}, code:{:?}", sepc, stval, code);
+    if (is_int == 0) && (code != 8) && (code != 9) {
+        use crate::backtrace::print_backtrace;
+        print_backtrace(tf);
+    }
 
 	match tf.scause.cause() {
 		Trap::Exception(Exception::Breakpoint) => breakpoint(&mut tf.sepc),
-		Trap::Exception(Exception::IllegalInstruction) => panic!("IllegalInstruction: {:#x}->{:#x}", sepc, stval),
+		Trap::Exception(Exception::InstructionMisaligned) => panic!("Instruction address misaligned: {:#x}->{:#x}", sepc, stval),
+		Trap::Exception(Exception::InstructionFault) => panic!("Instruction access fault: {:#x}->{:#x}", sepc, stval),
+		Trap::Exception(Exception::IllegalInstruction) => panic!("Illegal instruction: {:#x}->{:#x}", sepc, stval),
         Trap::Exception(Exception::LoadFault) => panic!("Load access fault: {:#x}->{:#x}", sepc, stval),
         Trap::Exception(Exception::StoreFault) => panic!("Store access fault: {:#x}->{:#x}", sepc, stval),
         Trap::Exception(Exception::LoadPageFault) => page_fault(stval, tf),
@@ -105,7 +111,7 @@ pub fn rust_trap(tf: &mut TrapFrame){
 		Trap::Interrupt(Interrupt::SupervisorTimer) => super_timer(),
 		Trap::Interrupt(Interrupt::SupervisorSoft) => super_soft(),
 		Trap::Interrupt(Interrupt::SupervisorExternal) => plic::handle_interrupt(),
-		_ => panic!("Undefined Trap: {:#x} {:#x}", is_int, code)
+		_ => panic!("Undefined Trap, is int: {:#x}, cause: {:#x}, sepc: {:#x}, stval: {:#x}", is_int, code, sepc, stval)
 	}
 }
 /*
@@ -141,6 +147,16 @@ fn super_timer(){
 		}
 	}
 
+
+    //tmp 网卡发包
+    use crate::init::DRIVERS;
+    unsafe {
+        for v in DRIVERS.lock().iter(){
+            v.lock().try_handle_interrupt(Some(99), 99);
+        }
+    }
+
+
 	//发生外界中断时，epc的指令还没有执行，故无需修改epc到下一条
 }
 
@@ -152,7 +168,7 @@ fn init_uart(){
     write!(crate::uart::Uart::new(0x1000_0000), "Uart writing test !\n");
     */
     // D1 ALLWINNER
-    //uart::Uart::new(0x02500000).simple_init();
+    uart::Uart::new(0x02500000).simple_init();
     use core::fmt::Write;
     write!(crate::uart::Uart::new(0x02500000), "Uart writing test !\r\n");
 
@@ -189,7 +205,7 @@ pub fn init_ext(){
     //
     // D1 ALLWINNER UART0 = 18
     plic::set_priority(18, 31);
-    plic::set_threshold(2);
+    plic::set_threshold(0);
     plic::enable(18);
     //plic::enable(10);
 
@@ -201,12 +217,10 @@ pub fn init_ext(){
     plic::enable(13);
     */
 
-    /*
-    plic::set_priority(33, 7);
+    // 网卡
+    plic::set_priority(62, 7);
     plic::set_threshold(0);
-    plic::enable(33);
-    */
-
+    plic::enable(62);
 
     // set opensbi s_insn()
     //sbi::set_s_insn(s_insn as usize);

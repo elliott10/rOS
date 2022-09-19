@@ -17,8 +17,9 @@ BASE_ADDRESS = 0x80200000;
 */
 
 /* D1 ALLWINNER
- */
 BASE_ADDRESS = 0x45000000;
+*/
+BASE_ADDRESS = 0x40020000;
 
 SECTIONS
 {
@@ -51,9 +52,10 @@ SECTIONS
         *(.bss.stack)
     }
 
+    /* .sbss 会存放为0的static变量，系统启动时需要清0 */
     .bss : {
         sbss = .;
-        *(.bss .bss.*)
+        *(.bss .bss.* .sbss)
         ebss = .;
     }
 

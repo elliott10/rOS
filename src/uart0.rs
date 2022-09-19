@@ -64,32 +64,27 @@ pub fn init(&mut self) {
 }
 
 pub fn simple_init(&mut self) {
-	//let ptr = self.base_address as *mut u8;
-	let ptr = self.base_address as *mut u32;
+	let ptr = self.base_address as *mut u8;
 	unsafe {
-        //D1 ALLWINNER的uart中断使能
-
         // Enable FIFO; (base + 2)
-        ptr.add(2).write_volatile(0x7);
+        ptr.add(2).write_volatile(0xC7);
 
         // MODEM Ctrl; (base + 4)
-        ptr.add(4).write_volatile(0x3);
+        ptr.add(4).write_volatile(0x0B);
 
-        // D1 UART_IER offset = 0x4
-        //
         // Enable interrupts; (base + 1)
-        ptr.add(1).write_volatile(0x1);
+        ptr.add(1).write_volatile(0x01);
     }
 }
 
 pub fn get(&mut self) -> Option<u8> {
-	let ptr = self.base_address as *mut u32;
+	let ptr = self.base_address as *mut u8;
 	unsafe {
-		//查看LSR的DR位为1则有数据
+		//查看LCR, DR位为1则有数据
 		if ptr.add(5).read_volatile() & 0b1 == 0 {
 			None
 		} else {
-			Some((ptr.add(0).read_volatile() & 0xff) as u8)
+			Some(ptr.add(0).read_volatile())
 		}
 	}
 
@@ -98,7 +93,7 @@ pub fn get(&mut self) -> Option<u8> {
 pub fn put(&mut self, c: u8) {
 	let ptr = self.base_address as *mut u8;
 	unsafe {
-		//此时transmitter empty, THR有效位是8
+		//此时transmitter empty
 		ptr.add(0).write_volatile(c);
 	}
 }
@@ -135,8 +130,8 @@ fn unsafe mmio_read(address: usize, offset: usize, value: u8) -> u8 {
 */
 
 pub fn handle_interrupt() {
-    // D1 ALLWINNER
-    let mut my_uart = Uart::new(0x02500000);
+    //let mut my_uart = Uart::new(0x1000_0000);
+    let mut my_uart = Uart::new(0x5023_0000);
 
 	if let Some(c) = my_uart.get() {
 		//CONSOLE

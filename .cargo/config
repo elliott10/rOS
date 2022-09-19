@@ -3,5 +3,8 @@ target = "riscv64imac-unknown-none-elf"
 
 [target.riscv64imac-unknown-none-elf]
 rustflags = [
-	"-C", "link-arg=-Tsrc/boot/linker64.ld",
+	"-C", "link-arg=-Tsrc/boot/linker64.ld", "-Cforce-frame-pointers=yes"
 ]
+
+# 也可设置环境变量 RUSTFLAGS
+# 或 参照cflag设置： rustc +nightly -Z unstable-options --target=wasm32-unknown-unknown --print target-spec-json

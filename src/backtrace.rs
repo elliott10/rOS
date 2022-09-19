@@ -1,0 +1,168 @@
+//
+// By benpichu@gmail.com
+//
+use addr2line::gimli;
+use addr2line::Context;
+use alloc::borrow::Cow;
+use alloc::boxed::Box;
+use core::option::Option;
+use core::slice;
+use lazy_static::*;
+use object::{File, Object, ObjectSection};
+
+use crate::context::TrapFrame;
+
+pub fn print_backtrace(tf: &TrapFrame) {
+    print!("\n\u{1B}[31m");
+    extern "C" {
+        fn stext();
+        fn etext();
+    }
+    let stext = stext as usize;
+    let etext = etext as usize;
+    let mut fp: usize;
+    let mut ra: usize;
+    /* by xly
+    unsafe {
+        llvm_asm!("mv $0,fp;auipc $1,0x0"
+            : "=r" (fp),"=r" (ra)
+            :
+            :
+            : "volatile"
+        );
+    }
+    */
+
+    fp = tf.x[8]; // 寄存器x8是帧指针
+    ra = tf.sepc;
+
+    println!("fp: {:#x}, ra: {:#x}, .text section: {:#x?}-{:#x?}", fp, ra, stext, etext);
+    println!("stack: {:#x?}", tf.x[2]);
+
+    // 处理sepc跑飞的情况
+    if  ra < stext {
+        ra = stext;
+    }else if ra > etext {
+        ra = etext;
+    }
+
+    let mut layer = 0usize;
+    while stext <= ra && ra <= etext && fp != 0x0 {
+        println!("{:?}: {:#x?}", layer, ra);
+        let mut frames = ADDR2LINE_CONTEXT
+            .as_ref()
+            .and_then(|ctx| ctx.context.find_frames(ra as u64).ok());
+        if let Some(frames) = frames.as_mut() {
+            while let Ok(Some(frame)) = frames.next() {
+                print!("    ");
+                if let Some(function) = frame.function {
+                    let name = function.demangle();
+                    print!(
+                        "{} ",
+                        name.as_ref()
+                            .map_or("<Error getting name>", |name| name.as_ref())
+                    );
+                }
+                if let Some(location) = frame.location {
+                    print!("at {}", location.file.unwrap_or("<Error getting file>"));
+                    if let Some(line) = location.line {
+                        print!(":{}", line);
+                        if let Some(column) = location.column {
+                            print!(":{}", column);
+                        }
+                    }
+                }
+                #[allow(clippy::println_empty_string)]
+                println!("")
+            }
+        }
+        println!("    fp: {:#x?}", fp);
+        if fp < stext {
+            println!("    fp: {:#x?} out of bounds", fp);
+            break;
+        }
+
+        unsafe {
+            ra = (fp as *mut usize).offset(-1).read_volatile();
+            fp = (fp as *mut usize).offset(-2).read_volatile();
+        }
+        layer += 1;
+    }
+    print!("\u{1B}[0m\n");
+}
+
+struct Addr2LineContext {
+    context: Context<gimli::EndianSlice<'static, gimli::RunTimeEndian>>,
+}
+
+unsafe impl Sync for Addr2LineContext {}
+
+fn load_debuginfo() -> Option<Addr2LineContext> {
+    let debuginfo_range =
+        //unsafe { slice::from_raw_parts_mut(_kernel_debuginfo_start as *mut u8, _kernel_debuginfo_end as usize - _kernel_debuginfo_start as usize) };
+        unsafe { slice::from_raw_parts_mut(DEBUGINFO_ELF_ADDRESS as *mut u8, DEBUGINFO_ELF_SIZE) };
+    let debuginfo_elf = File::parse(debuginfo_range).ok()?;
+    let endian = if debuginfo_elf.is_little_endian() {
+        gimli::RunTimeEndian::Little
+    } else {
+        gimli::RunTimeEndian::Big
+    };
+    let load_section = |id: gimli::SectionId| -> Result<_, gimli::Error> {
+        match debuginfo_elf.section_by_name(id.name()).as_ref() {
+            Some(section) => Ok(section
+                .uncompressed_data()
+                .unwrap_or(Cow::Borrowed(&[][..]))),
+            None => Ok(Cow::Borrowed(&[][..])),
+        }
+    };
+    let load_sep_section = |_| Ok(Cow::Borrowed(&[][..]));
+    let dwarf_cow = Box::leak(Box::new(
+        gimli::Dwarf::load(load_section, load_sep_section).ok()?,
+    ));
+    let borrow_section: &dyn for<'a> Fn(
+        &'a Cow<[u8]>,
+    ) -> gimli::EndianSlice<'a, gimli::RunTimeEndian> =
+        &|section| gimli::EndianSlice::new(&*section, endian);
+    let dwarf = dwarf_cow.borrow(&borrow_section);
+    addr2line::Context::from_dwarf(dwarf)
+        .map(|context| Addr2LineContext { context })
+        .ok()
+}
+
+/// Hard link kernel debuginfo ELF
+#[cfg(feature = "link_kdbg")]
+global_asm!(concat!(
+    r#"
+	.section .rodata.kdbg
+	.global _kernel_debuginfo_start
+	.global _kernel_debuginfo_end
+_kernel_debuginfo_start:
+    .incbin ""#,
+    env!("KDBG"),
+    r#""
+_kernel_debuginfo_end:
+"#
+));
+
+#[cfg(feature = "link_kdbg")]
+extern {
+    fn _kernel_debuginfo_start();
+    fn _kernel_debuginfo_end();
+}
+
+pub const DEBUGINFO_ELF_ADDRESS: usize = 0x80000000; //这里不使用。将来考虑把内核符号信息文件放在指定地址
+pub const DEBUGINFO_ELF_SIZE: usize = 0x200000;
+
+lazy_static! {
+    //static ref ADDR2LINE_CONTEXT: Option<Addr2LineContext> = load_debuginfo();
+    static ref ADDR2LINE_CONTEXT: Option<Addr2LineContext> = None;
+}
+
+pub fn init() {
+    extern "C" {
+        fn skernel();
+        fn ekernel();
+    }
+    println!("kernel: {:#x?}-{:#x?}", skernel as usize, ekernel as usize);
+    println!("addr2line ok? {:?}", ADDR2LINE_CONTEXT.is_some());
+}
