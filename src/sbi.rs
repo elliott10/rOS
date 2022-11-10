@@ -1,3 +1,4 @@
+use core::arch::asm;
 
 pub fn console_putchar(ch: usize){
 	sbi_call(SBI_CONSOLE_PUTCHAR, ch, 0, 0);
@@ -9,28 +10,26 @@ pub fn console_getchar() -> isize {
 
 pub fn console_putchar_u8(ch: u8){
 	let ret: isize;
-	let arg0: char = ch as char;
+	//let arg0: char = ch as char;
+	let arg0: u8 = ch;
 	let arg1: usize = 0;
 	let arg2: usize = 0;
 	let which: usize = 1; //SBI_ECALL_CONSOLE_PUTCHAR
 	unsafe{
-		llvm_asm!("ecall"
-		     :"={x10}"(ret)
-		     :"{x10}"(arg0), "{x11}"(arg1), "{x12}"(arg2), "{x17}"(which)
-		     :"memory"
-		     :"volatile"
-		);
+		asm!("ecall",
+		     lateout("x10") ret,
+		     in("x10") arg0, in("x11") arg1, in("x12") arg2, in("x17") which
+             );
 	}
 }
 
 fn sbi_call(which: usize, arg0: usize, arg1: usize, arg2: usize) -> isize{
 	let ret: isize;
 	unsafe{
-		llvm_asm!("ecall"
-		     :"={x10}"(ret)
-		     :"{x10}"(arg0), "{x11}"(arg1), "{x12}"(arg2), "{x17}"(which)
-		     :"memory"
-		     :"volatile");
+        asm!("ecall",
+             lateout("x10") ret,
+             in("x10") arg0, in("x11") arg1, in("x12") arg2, in("x17") which
+            );
 	}
 	ret
 }

@@ -22,8 +22,9 @@ rcore-fs = { git = "https://github.com/rcore-os/rcore-fs", rev = "6df6cd24" }
 rcore-fs-sfs = { git = "https://github.com/rcore-os/rcore-fs", rev = "6df6cd24" }
 fatfs = { git = "https://github.com/rafalh/rust-fatfs.git", rev = "26fa79", default-features = false }
 
-riscv = { git = "https://github.com/rcore-os/riscv", features = ["inline-asm"] }
+riscv = { version = "0.9.0" }
 k210-hal = { git = "https://github.com/riscv-rust/k210-hal" }
+d1-pac = { git = "https://github.com/duskmoon314/aw-pac.git" }
 
 [dependencies.lazy_static]
 version = "1.0"

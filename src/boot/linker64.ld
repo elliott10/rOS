@@ -10,15 +10,11 @@ BASE_ADDRESS 需对接上opensbi的jump地址, 如果地址太小如0x8000c000�
 也可以尝试： make clean
 */
 
-BASE_ADDRESS = 0x80010000;
-
 /* Qemu
 BASE_ADDRESS = 0x80200000;
 */
 
-/* D1 ALLWINNER
-BASE_ADDRESS = 0x45000000;
-*/
+/* D1 ALLWINNER */
 BASE_ADDRESS = 0x40020000;
 
 SECTIONS

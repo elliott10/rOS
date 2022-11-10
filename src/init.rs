@@ -1,3 +1,5 @@
+use core::arch::global_asm;
+
 global_asm!(include_str!("boot/entry64.asm"));
 global_asm!(include_str!("link_user.S"));
 
@@ -9,6 +11,7 @@ use crate::logger;
 use crate::consts::*;
 
 use crate::timer::{MMIO_MTIMECMP0, MMIO_MTIMECMP1, MMIO_MTIME};
+use core::arch::asm;
 
 use spin::{RwLock, Mutex};
 use alloc::vec::Vec;
@@ -18,7 +21,7 @@ use super::net::rtl8211f::RTL8211F;
 use lazy_static::lazy_static;
 lazy_static! {
     //pub static ref DRIVERS: RwLock<Vec<Arc<Mutex<Driver>>>> = RwLock::new(Vec::new());
-    pub static ref DRIVERS: Mutex<Vec<Arc<Mutex<Driver>>>> = Mutex::new(Vec::new());
+    pub static ref DRIVERS: Mutex<Vec<Arc<Mutex<dyn Driver>>>> = Mutex::new(Vec::new());
 }
 
 pub trait Driver: Send + Sync {
@@ -74,7 +77,8 @@ extern "C" {
 }
 
 #[no_mangle]
-extern "C" fn rust_main() -> !{
+extern "C" fn rust_main(hartid: usize, dtb: usize) -> !{
+    println!("\r\nrust_main, hart id: {}, dtb: {:#x}", hartid, dtb);
 
     //crate::interrupt::init_soft();
 
@@ -97,13 +101,6 @@ extern "C" fn rust_main() -> !{
 	sbi::console_putchar_u8(b'L');
 	sbi::console_putchar_u8(b'Y');
 	sbi::console_putchar_u8(b'\n');
-
-println!("      ____");
-println!(" ____/ ___|___  _ __ ___");
-println!("|_  / |   / _ \\| '__/ _ \\");
-println!(" / /| |__| (_) | | |  __/");
-println!("/___|\\____\\___/|_|  \\___|");
-println!();
 
     /*
     let mut _in: usize = 0;
@@ -162,13 +159,12 @@ println!();
 	println!("+++++ Free physical memory paddr = [{:#x}, {:#x})", end as usize - (KERNEL_BEGIN_VADDR - KERNEL_BEGIN_PADDR), PHYSICAL_MEMORY_END);
 
 	unsafe{
-		llvm_asm!("ebreak"::::"volatile");
+		asm!("ebreak");
 	}
 
     //crate::fs::init();
 
-
-
+    /*
     /////////
     //EAPOL packet: 0007326b9940 ca9027e0a80f 888e020000050104000501
     let frame: Box<[u8]> = Box::new(
@@ -195,7 +191,7 @@ println!();
     crate::timer::init();
 
     println!("OK");
-
+    */
     loop {}
 
     //panic!("end of rust_main()");

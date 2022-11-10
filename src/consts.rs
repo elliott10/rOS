@@ -25,4 +25,3 @@ pub const KERNEL_BEGIN_PADDR: usize = 0x40020000;
 pub const KERNEL_BEGIN_VADDR: usize = 0x40020000;
 
 // paddr + offset = vaddr
-

@@ -25,6 +25,10 @@ struct Stdout;
 
 impl fmt::Write for Stdout {
 	fn write_str(&mut self, s: &str) -> fmt::Result {
+        /*
+        use core::fmt::Write;
+        write!(crate::uart::Uart::new(0x02500000), "{}", s);
+        */
 		puts(s);
 		Ok(())
 	}

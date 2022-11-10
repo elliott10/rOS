@@ -21,7 +21,8 @@ env:
 export USER_IMG = riscv64.img
 
 kernel:
-	cargo build -vv $(build_args)
+	cargo build $(build_args)
+	#cargo build -vv $(build_args)
 
 $(bin): kernel
 	$(objcopy) $(kernel) --strip-all -O binary $@

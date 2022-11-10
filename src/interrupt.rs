@@ -21,6 +21,8 @@ use crate::sbi;
 use crate::plic;
 use crate::uart;
 
+use core::arch::global_asm;
+
 use k210_hal::{clock::Clocks, pac, prelude::*};
 use k210_hal::serial::SerialExt;
 
@@ -67,14 +69,17 @@ pub fn init(){
         //M模式时的初始化
         //init_m();
 
+        //初始化串口时别开外部中断
+        init_uart();
+
+        init_ext();
+
         //注意！bug! 如果之后sie::set_ssoft(),会出现无法收到S态的外部中断和时钟中断
         //
         //外部中断
         sie::set_sext(); //防止外部中断干扰初始化
 
-        init_ext();
 
-        init_uart();
 	}
 	println!("+++ setup interrupt! +++");
 }
@@ -168,7 +173,7 @@ fn init_uart(){
     write!(crate::uart::Uart::new(0x1000_0000), "Uart writing test !\n");
     */
     // D1 ALLWINNER
-    uart::Uart::new(0x02500000).simple_init();
+    uart::Uart::new(0x02500000).init();
     use core::fmt::Write;
     write!(crate::uart::Uart::new(0x02500000), "Uart writing test !\r\n");
 

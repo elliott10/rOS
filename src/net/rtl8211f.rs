@@ -170,8 +170,11 @@ const BMCR_RESET: u32 = 0x8000;
 const BMCR_PDOWN: u32 = 0x0800;
 
 
+// Rust 不填充空数据，各个类型的数据紧密排列, 但可能会导致严重错误
+// #[repr(packed)]
+
 #[derive(Debug, Copy, Clone)]
-#[repr(packed)]
+#[repr(C)]
 pub struct dma_desc { // size: 16
     desc0: u32, // Status
     desc1: u32, // Buffer Size

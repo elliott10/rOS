@@ -1,4 +1,6 @@
 // c906
+use core::arch::asm;
+
 const L1_CACHE_BYTES: u64 = 64;
 const CACHE_LINE_SIZE: u64 = 64;
 
@@ -58,6 +60,7 @@ pub fn invalidate_dcache_range(start: u64, end: u64) {
 
 pub fn fence_w() {
     unsafe {
-        llvm_asm!("fence ow, ow" ::: "memory");
+        //llvm_asm!("fence ow, ow" ::: "memory");
+        asm!("fence ow, ow");
     }
 }

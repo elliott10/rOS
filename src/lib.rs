@@ -1,7 +1,6 @@
 #![no_std]
 #![feature(global_asm)]
 #![feature(asm)]
-#![feature(llvm_asm)]
 //#![feature(renamed_spin_loop)]
 
 //alloc test
@@ -37,4 +36,3 @@ mod consts;
 mod fatfs;
 
 mod net;
-
