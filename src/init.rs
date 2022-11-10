@@ -189,9 +189,10 @@ extern "C" fn rust_main(hartid: usize, dtb: usize) -> !{
     /////////
 
     crate::timer::init();
+    */
 
     println!("OK");
-    */
+
     loop {}
 
     //panic!("end of rust_main()");

@@ -146,7 +146,7 @@ pub fn get(&mut self) -> Option<u8> {
 	unsafe {
 		//查看LSR的DR位为1则有数据
         //if ptr.add(5).read_volatile() & 0b1 == 0 {
-		if ptr.add(31).read_volatile() & 0b100 != 0 {
+		if ptr.add(31).read_volatile() & 0b1000 == 0 {
 			None
 		} else {
 			Some((ptr.add(0).read_volatile() & 0xff) as u8)
