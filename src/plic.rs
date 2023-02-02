@@ -1,12 +1,12 @@
-use crate::uart;
+use crate::consts::PLIC_BASE;
 
 //通过MMIO地址对平台级中断控制器PLIC的寄存器进行设置
 //
 //Source 1 priority: 0x0c000004
 //Source 2 priority: 0x0c000008
-const PLIC_PRIORITY:   usize = 0x1000_0000;
+const PLIC_PRIORITY:   usize = PLIC_BASE;
 //Pending 32位寄存器，每一位标记一个中断源ID
-const PLIC_PENDING:    usize = 0x1000_1000;
+const PLIC_PENDING:    usize = PLIC_BASE + 0x1000;
 
 //Target 0 threshold: 0x0c200000
 //Target 0 claim    : 0x0c200004
@@ -14,8 +14,8 @@ const PLIC_PENDING:    usize = 0x1000_1000;
 //Target 1 threshold: 0x0c201000 *
 //Target 1 claim    : 0x0c201004 *
 
-const PLIC_THRESHOLD:  usize = 0x1020_1000;
-const PLIC_CLAIM:      usize = 0x1020_1004;
+const PLIC_THRESHOLD:  usize = PLIC_BASE + 0x201000;
+const PLIC_CLAIM:      usize = PLIC_BASE + 0x201004;
 
 //注意一个核的不同权限模式是不同Target
 //Target: 0  1  2        3  4  5
@@ -23,7 +23,7 @@ const PLIC_CLAIM:      usize = 0x1020_1004;
 //
 //target 0 enable: 0x0c002000
 //target 1 enable: 0x0c002080 *
-const PLIC_INT_ENABLE: usize = 0x1000_2080 ; //基于opensbi后一般运行于Hart0 S态，故为Target1
+const PLIC_INT_ENABLE: usize = PLIC_BASE + 0x2080 ; //基于opensbi后一般运行于Hart0 S态，故为Target1
 
 //PLIC是async cause 11
 //声明claim会清除中断源上的相应pending位。
@@ -114,20 +114,21 @@ pub fn handle_interrupt() {
 				//virtio::handle_interrupt(interrupt);
                 println!("virtio external interrupt: {}", interrupt);
 			},
-			//10 => { //UART中断ID是10
-			18 => { //D1 ALLWINNER
-			//33 => { //UART中断ID是10
+            10 => { //UART中断ID是10
+                println!(" External interrupt, UART: {} ", interrupt);
+                crate::uart::handle_interrupt();
 
-                println!("External interrupt, UART: {}", interrupt);
-                uart::handle_interrupt();
+                /*
+                use crate::sbi;
+                let sbic = sbi::console_getchar();
+                print!("sbi: {}", sbic);
+                */
 
-        /*
-        use crate::sbi;
-        let sbic = sbi::console_getchar();
-        print!("sbi: {}", sbic);
-        */
-
-			},
+            },
+            18 => { //D1 ALLWINNER
+                println!(" External interrupt, UART: {} ", interrupt);
+                crate::uart_d1::handle_interrupt();
+            },
 			62 => {
                 println!("External interrupt, eth: {}", interrupt);
 
@@ -149,5 +150,4 @@ pub fn handle_interrupt() {
 		complete(interrupt);
 	}
 }
-
 

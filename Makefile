@@ -1,5 +1,6 @@
 target := riscv64imac-unknown-none-elf
 mode := debug
+board ?= fu740
 kernel := target/$(target)/$(mode)/os
 kernel_debuginfo := target/$(target)/$(mode)/os.debuginfo
 bin := target/$(target)/$(mode)/kernel.bin
@@ -19,6 +20,16 @@ env:
 	rustup target add $(target)
 
 export USER_IMG = riscv64.img
+
+ifeq ($(board), qemu)
+	build_args += --features qemu
+else ifeq ($(board), k210)
+	build_args += --features k210
+else ifeq ($(board), D1)
+	build_args += --features D1
+else ifeq ($(board), fu740)
+	build_args += --features fu740
+endif
 
 kernel:
 	cargo build $(build_args)
@@ -68,10 +79,16 @@ qemu:
 
 run: build qemu
 
+fu740: build
+	cp $(bin) firmware/fu740/ros.bin
+	mkimage -f firmware/fu740/fu740_fdt.its ros.itb
+	@echo 'Build ros.itb FIT-uImage done'
+	cp ros.itb /srv/tftp/
+
 build-thead: build
 
 run-thead: build
-	@cp C906/fw_jump-0x40020000.bin fw.bin
+	@cp firmware/C906/fw_jump-0x40020000.bin fw.bin
 	@dd if=$(bin) of=fw.bin bs=1 seek=131072
 	echo $(PWD)/fw.bin
 	xfel ddr d1

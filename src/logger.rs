@@ -19,7 +19,7 @@ impl Log for SimpleLogger {
 
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
-            println!("\x1b[{}m {} - {} \x1b[0m", level_to_color_code(record.level()), record.level(), record.args());
+            println!("\x1b[{}m {:5} - {} \x1b[0m", level_to_color_code(record.level()), record.level(), record.args());
         }
     }
 

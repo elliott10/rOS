@@ -1,5 +1,7 @@
-pub mod mii;
-pub mod rtl8211f;
+cfg_if::cfg_if! { if #[cfg(feature = "D1")] {
+    pub mod mii;
+    pub mod rtl8211f;
+}}
 
 /// External functions that drivers must use
 pub trait Provider {

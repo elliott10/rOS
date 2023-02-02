@@ -19,9 +19,10 @@ use crate::timer::{
 use crate::context::TrapFrame;
 use crate::sbi;
 use crate::plic;
-use crate::uart;
+use crate::consts::UART_BASE;
 
 use core::arch::global_asm;
+use core::fmt::Write;
 
 use k210_hal::{clock::Clocks, pac, prelude::*};
 use k210_hal::serial::SerialExt;
@@ -146,7 +147,7 @@ fn super_timer(){
 	unsafe {
 		//多个线程都能访问，同时可能会造成错误
 		TICKS += 1;
-		if (TICKS == 100){
+		if TICKS == 100{
 			TICKS = 0;
 			println!("100 ticks");
 		}
@@ -166,16 +167,19 @@ fn super_timer(){
 }
 
 fn init_uart(){
-    /*
-    uart::Uart::new(0x1000_0000).init();
-
-    use core::fmt::Write;
-    write!(crate::uart::Uart::new(0x1000_0000), "Uart writing test !\n");
-    */
-    // D1 ALLWINNER
-    uart::Uart::new(0x02500000).init();
-    use core::fmt::Write;
-    write!(crate::uart::Uart::new(0x02500000), "Uart writing test !\r\n");
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "qemu")] {
+            crate::uart::Uart::new(UART_BASE).init();
+            write!(crate::uart::Uart::new(UART_BASE), "Uart writing test !\n");
+        } else if #[cfg(feature = "fu740")] {
+            crate::uart::Uart::new(UART_BASE).simple_init();
+            write!(crate::uart::Uart::new(UART_BASE), "Uart writing test !\n");
+        } else if  #[cfg(feature = "D1")] {
+            // D1 ALLWINNER
+            crate::uart_d1::Uart::new(UART_BASE).init();
+            write!(crate::uart_d1::Uart::new(UART_BASE), "Uart writing test !\r\n");
+        }
+    }
 
     /*
     let p = pac::Peripherals::take().unwrap();
@@ -204,15 +208,31 @@ fn init_uart(){
 }
 
 pub fn init_ext(){
-    // Qemu virt
-    // UART0 = 10
-    //plic::set_priority(10, 7);
-    //
-    // D1 ALLWINNER UART0 = 18
-    plic::set_priority(18, 31);
-    plic::set_threshold(0);
-    plic::enable(18);
-    //plic::enable(10);
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "qemu")] {
+            // Qemu virt
+            // UART0 = 10
+            plic::set_priority(10, 7);
+            plic::set_threshold(0);
+            plic::enable(10);
+
+        } else if #[cfg(feature = "fu740")] {
+            plic::set_priority(0x27, 7);
+            plic::set_threshold(0);
+            plic::enable(0x27);
+
+        } else if #[cfg(feature = "D1")] {
+            // D1 ALLWINNER UART0 = 18
+            plic::set_priority(18, 31);
+            plic::set_threshold(0);
+            plic::enable(18);
+
+            // 网卡
+            plic::set_priority(62, 7);
+            plic::set_threshold(0);
+            plic::enable(62);
+        }
+    }
 
     // k210 UART = 33
     // 默认调试串口 UART3 = 13
@@ -221,11 +241,6 @@ pub fn init_ext(){
     plic::set_threshold(0);
     plic::enable(13);
     */
-
-    // 网卡
-    plic::set_priority(62, 7);
-    plic::set_threshold(0);
-    plic::enable(62);
 
     // set opensbi s_insn()
     //sbi::set_s_insn(s_insn as usize);

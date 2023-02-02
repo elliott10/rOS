@@ -28,6 +28,6 @@ _start:
 	.align 12
 	.global bootstack
 bootstack:
-	.space 1024 * 16
+	.space 1024 * 64
 	.global bootstacktop
 bootstacktop:

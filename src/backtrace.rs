@@ -72,7 +72,6 @@ pub fn print_backtrace(tf: &TrapFrame) {
                         }
                     }
                 }
-                #[allow(clippy::println_empty_string)]
                 println!("")
             }
         }

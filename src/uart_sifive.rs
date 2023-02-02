@@ -1,5 +1,6 @@
 use core::convert::TryInto;
 use core::fmt::{Error, Write};
+use crate::consts::UART_BASE;
 
 //use crate::console::push_stdin;
 
@@ -110,28 +111,8 @@ impl Write for Uart {
 	}
 }
 
-/*
-fn unsafe mmio_write(address: usize, offset: usize, value: u8) {
-	//write_volatile() 是 *mut raw 的成员；
-	//new_pointer = old_pointer + sizeof(pointer_type) * offset
-	//也可使用reg.offset
-
-	let reg = address as *mut u8;
-	reg.add(offset).write_volatile(value);
-}
-
-fn unsafe mmio_read(address: usize, offset: usize, value: u8) -> u8 {
-
-	let reg = address as *mut u8;
-
-	//读取8 bits
-	reg.add(offset).read_volatile(value) //无分号可直接返回值
-}
-*/
-
 pub fn handle_interrupt() {
-    //let mut my_uart = Uart::new(0x1000_0000);
-    let mut my_uart = Uart::new(0x5023_0000);
+    let mut my_uart = Uart::new(UART_BASE);
 
 	if let Some(c) = my_uart.get() {
 		//CONSOLE

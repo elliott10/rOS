@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(global_asm)]
 #![feature(asm)]
 //#![feature(renamed_spin_loop)]
 
@@ -28,6 +27,8 @@ mod timer;
 
 mod cpu;
 mod uart;
+mod uart_d1;
+mod uart_sifive;
 mod plic;
 
 //mod fs;

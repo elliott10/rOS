@@ -17,7 +17,7 @@ use spin::{RwLock, Mutex};
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 
-use super::net::rtl8211f::RTL8211F;
+use cfg_if::cfg_if;
 use lazy_static::lazy_static;
 lazy_static! {
     //pub static ref DRIVERS: RwLock<Vec<Arc<Mutex<Driver>>>> = RwLock::new(Vec::new());
@@ -117,12 +117,13 @@ extern "C" fn rust_main(hartid: usize, dtb: usize) -> !{
 
 	println!("--------- Hello World! ---------");
 
-    use log::{info, debug, trace, warn};
+    use log::{info, debug, trace, warn, error};
     logger::init("DEBUG");
 
     info!("info");
     debug!("debug");
     warn!("warn");
+    error!("error");
     trace!("trace");
 
     unsafe {
@@ -164,38 +165,68 @@ extern "C" fn rust_main(hartid: usize, dtb: usize) -> !{
 
     //crate::fs::init();
 
-    /*
-    /////////
-    //EAPOL packet: 0007326b9940 ca9027e0a80f 888e020000050104000501
-    let frame: Box<[u8]> = Box::new(
-        [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x52, 0x54, 0x00, 0x12, 0x34, 0x56,
-        0x88, 0x8e, 0x02, 0x00, 0x00, 0x05, 0x01, 0x04, 0x00, 0x05, 0x01]
-        );
+    cfg_if! { if #[cfg(feature = "D1")] {
+        //EAPOL packet: 0007326b9940 ca9027e0a80f 888e020000050104000501
+        let frame: Box<[u8]> = Box::new(
+            [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x52, 0x54, 0x00, 0x12, 0x34, 0x56,
+            0x88, 0x8e, 0x02, 0x00, 0x00, 0x05, 0x01, 0x04, 0x00, 0x05, 0x01]
+            );
 
-    let mac: [u8; 6] = [0x52, 0x54, 0x00, 0x12, 0x34, 0x56];
-    let mac: [u8; 6] = [0, 0, 0, 0, 0, 0];
-    let mut rtl8211f = RTL8211F::<Provider>::new(&mac);
+        let mac: [u8; 6] = [0x52, 0x54, 0x00, 0x12, 0x34, 0x56];
+        let mac: [u8; 6] = [0, 0, 0, 0, 0, 0];
+        let mut rtl8211f = crate::net::rtl8211f::RTL8211F::<Provider>::new(&mac);
 
-    unsafe {
-        rtl8211f.open();
-        rtl8211f.set_rx_mode();
-        rtl8211f.adjust_link();
+        unsafe {
+            rtl8211f.open();
+            rtl8211f.set_rx_mode();
+            rtl8211f.adjust_link();
 
-        //开始接收和发送数据
+            //开始接收和发送数据
+        }
+
+        let mut driver = Arc::new(Mutex::new(rtl8211f));
+        DRIVERS.lock().push(driver.clone());
+
+    } else if #[cfg(feature = "fu740")] {
+
+        let mut macb_device = cadence_macb::eth_macb::open().unwrap();
+
+        let ping_frame: Box<[u8]> = Box::new(
+                [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x70, 0xb3, 0xd5, 0x92, 0xfa, 0x99, 0x08, 0x06, 0x00, 0x01,
+                 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x70, 0xb3, 0xd5, 0x92, 0xfa, 0x99, 0xc0, 0xa8, 0x00, 0x7b, //192.168.0.123
+                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0xa8, 0x00, 0x42]); //ping 192.168.0.66
+
+        // 有时丢失1或2个网络包不能发出？
+        cadence_macb::eth_macb_ops::macb_send(&mut macb_device, &ping_frame);
+        cadence_macb::eth_macb_ops::macb_send(&mut macb_device, &ping_frame);
+        cadence_macb::eth_macb_ops::macb_send(&mut macb_device, &ping_frame);
+        cadence_macb::eth_macb_ops::macb_send(&mut macb_device, &ping_frame);
+
+        loop {
+            //cadence_macb::eth_macb_ops::macb_send(&mut macb_device, &ping_frame);
+
+            cadence_macb::eth_macb::msdelay(100);
+
+            let mut rx_buf = [0 as u8; 2048];
+            cadence_macb::eth_macb_ops::macb_recv(&mut macb_device, &mut rx_buf);
+            if rx_buf[0] != 0 {
+                print_hex_dump(&rx_buf, 64);
+            }
+        }
+
+    }
     }
 
-    let mut driver = Arc::new(Mutex::new(rtl8211f));
-    DRIVERS.lock().push(driver.clone());
-    /////////
-
     crate::timer::init();
-    */
 
     println!("OK");
 
-    loop {}
+    loop {
+        unsafe{ asm!("wfi"); }
+    }
 
     //panic!("end of rust_main()");
+    #[allow(unreachable_code)]
 	loop {
 		if let Some(c) = getchar() {
 			match c {
@@ -221,3 +252,27 @@ extern "C" fn rust_main(hartid: usize, dtb: usize) -> !{
 
 }
 
+pub fn print_hex_dump(buf: &[u8], len: usize) {
+    //let mut linebuf: [char; 16] = [0 as char; 16];
+
+    use alloc::string::String;
+    let mut linebuf = String::with_capacity(32);
+    let buf_len = buf.len();
+
+    for i in 0..len {
+        if (i % 16) == 0 {
+            print!("\t{:?}\nHEX DUMP: ", linebuf);
+            //linebuf.fill(0 as char);
+            linebuf.clear();
+        }
+
+        if i >= buf_len {
+            print!(" {:02x}", 0);
+        } else {
+            print!(" {:02x}", buf[i]);
+            //linebuf[i%16] = buf[i] as char;
+            linebuf.push(buf[i] as char);
+        }
+    }
+    print!("\t{:?}\n", linebuf);
+}
